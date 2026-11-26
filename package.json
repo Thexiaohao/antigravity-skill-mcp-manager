@@ -1,0 +1,34 @@
+{
+  "name": "antigravity-skill-mcp-manager",
+  "version": "2.2.0",
+  "description": "An interactive MCP App dashboard for Google Antigravity to organize, categorize, reorder, toggle, and annotate installed Skills & MCP Servers (Bilingual EN / 中文).",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node server.mjs"
+  },
+  "keywords": [
+    "antigravity",
+    "google-antigravity",
+    "mcp",
+    "mcp-app",
+    "skills",
+    "skill-manager",
+    "mcp-manager"
+  ],
+  "author": "Thexiaohao",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Thexiaohao/antigravity-skill-mcp-manager.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
