@@ -133,6 +133,7 @@ let renamingCategory: string | null = null;
 let lastFocusRefresh = 0;
 
 const attachedItems: { key: string; label: string; contextText: string }[] = [];
+let multiAttach = false;
 
 // Track group & plugin fold states
 const collapsedGroups = new Set<string>();
@@ -234,8 +235,17 @@ async function syncAttachedContext() {
   try {
     if (attachedItems.length === 0) {
       await app.updateModelContext({ content: [] });
+    } else if (attachedItems.length === 1) {
+      const only = attachedItems[0];
+      await app.updateModelContext({
+        content: [{ type: 'text', text: `[${only.label}] ${only.contextText}` }],
+      });
     } else {
-      const combined = attachedItems.map((x) => `- ${x.contextText}`).join('\n');
+      const names = attachedItems.map((x) => x.label).join(' + ');
+      const header = getLang() === 'en'
+        ? `Selected ${attachedItems.length} items (${names}):`
+        : `已选 ${attachedItems.length} 项（${names}）：`;
+      const combined = `${header}\n` + attachedItems.map((x) => `- ${x.contextText}`).join('\n');
       await app.updateModelContext({
         content: [{ type: 'text', text: combined }],
       });
@@ -253,6 +263,9 @@ async function toggleAttachItem(key: string, label: string, contextText: string)
     render();
     showToast(t().detachedToast);
   } else {
+    if (!multiAttach) {
+      attachedItems.length = 0;
+    }
     attachedItems.push({ key, label, contextText });
     await syncAttachedContext();
     render();
@@ -279,6 +292,10 @@ function renderAttachedBar() {
         )
         .join('')}
     </div>
+    <label class="setting-check" style="font-size:11px;">
+      <input type="checkbox" id="multi-attach-chk" ${multiAttach ? 'checked' : ''} />
+      <span>${escapeHtml(tr.multiAttachLabel)}</span>
+    </label>
     <button class="btn btn-xs btn-secondary" id="clear-attached-btn">${escapeHtml(tr.clearAttached)}</button>
   `;
   bar.querySelectorAll<HTMLButtonElement>('[data-unattach]').forEach((btn) => {
@@ -289,6 +306,9 @@ function renderAttachedBar() {
       await syncAttachedContext();
       render();
     };
+  });
+  document.getElementById('multi-attach-chk')?.addEventListener('change', (e) => {
+    multiAttach = Boolean((e.target as HTMLInputElement).checked);
   });
   document.getElementById('clear-attached-btn')?.addEventListener('click', async () => {
     attachedItems.length = 0;
@@ -1062,15 +1082,10 @@ function renderSkillCard(
       : `<button class="btn btn-xs btn-muted" data-toggle-kind="skill" data-toggle-name="${escapeHtml(s.name)}" data-toggle-next="false">${escapeHtml(tr.btnDisable)}</button>`
     : '';
 
-  const sendBtn =
-    canSendMessage && !s.disabled
-      ? `<button class="btn btn-xs btn-secondary" data-send="${escapeHtml(prompt)}">${escapeHtml(tr.btnSend)}</button>`
-      : '';
-
   const isAttached = attachedItems.some((x) => x.key === key);
   const attachBtn =
     canUpdateContext && !s.disabled
-      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(s.name)}" data-attach-text="${escapeHtml(prompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
+      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-primary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(s.name)}" data-attach-text="${escapeHtml(prompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
       : '';
 
   return `
@@ -1084,8 +1099,7 @@ function renderSkillCard(
         <div class="card-ops">
           ${toggleBtn}
           ${attachBtn}
-          <button class="btn btn-xs btn-primary" data-copy="${escapeHtml(prompt)}">${escapeHtml(tr.btnCopy)}</button>
-          ${sendBtn}
+          <button class="btn btn-xs btn-secondary" data-copy="${escapeHtml(prompt)}">${escapeHtml(tr.btnCopy)}</button>
           <button class="btn btn-xs btn-secondary" data-toggle-edit="${escapeHtml(key)}">${escapeHtml(isEditing ? tr.btnCollapseEdit : tr.btnEdit)}</button>
         </div>
       </div>
@@ -1141,7 +1155,7 @@ function renderMcpCard(m: McpItem, siblingNames: string[]): string {
   const isAttached = attachedItems.some((x) => x.key === key);
   const attachBtn =
     canUpdateContext && !m.disabled
-      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(m.name)}" data-attach-text="${escapeHtml(mcpPrompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
+      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-primary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(m.name)}" data-attach-text="${escapeHtml(mcpPrompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
       : '';
 
   return `
@@ -1238,10 +1252,7 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
     const pAttached = attachedItems.some((x) => x.key === pAttachKey);
 
     const pAttachBtn = canUpdateContext
-      ? `<button class="btn btn-xs ${pAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(pAttachKey)}" data-attach-label="🧩 ${escapeHtml(pluginName)}" data-attach-text="${escapeHtml(pluginPrompt)}">${escapeHtml(pAttached ? tr.btnAttached : tr.btnAttach)}</button>`
-      : '';
-    const pSendBtn = canSendMessage
-      ? `<button class="btn btn-xs btn-secondary" data-send="${escapeHtml(pluginPrompt)}">${escapeHtml(tr.btnSend)}</button>`
+      ? `<button class="btn btn-xs ${pAttached ? 'btn-enable' : 'btn-primary'}" data-attach-key="${escapeHtml(pAttachKey)}" data-attach-label="🧩 ${escapeHtml(pluginName)}" data-attach-text="${escapeHtml(pluginPrompt)}">${escapeHtml(pAttached ? tr.btnAttached : tr.btnAttach)}</button>`
       : '';
 
     parts.push(`
@@ -1253,8 +1264,7 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
           ${hasNew ? '<span class="badge badge-new">🆕</span>' : ''}
           <span class="plugin-ops" onclick="event.stopPropagation()">
             ${pAttachBtn}
-            <button class="btn btn-xs btn-primary" data-copy="${escapeHtml(pluginPrompt)}">${escapeHtml(tr.btnCopy)}</button>
-            ${pSendBtn}
+            <button class="btn btn-xs btn-secondary" data-copy="${escapeHtml(pluginPrompt)}">${escapeHtml(tr.btnCopy)}</button>
           </span>
           <span class="group-count">${pItems.length}</span>
         </div>
