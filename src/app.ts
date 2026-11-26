@@ -456,8 +456,6 @@ function renderCategoryManager() {
         <span class="drag-handle" title="Drag">⋮⋮</span>
         <span class="cat-mgr-name">${escapeHtml(displayCategoryName(cat, lang))}</span>
         <div class="cat-mgr-btns">
-          <button class="btn btn-xs btn-secondary" data-move-cat="${escapeHtml(cat)}" data-dir="up" ${idx === 0 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveUp)}">↑</button>
-          <button class="btn btn-xs btn-secondary" data-move-cat="${escapeHtml(cat)}" data-dir="down" ${idx === catalog.categories.length - 1 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveDown)}">↓</button>
           <button class="btn btn-xs btn-secondary" data-rename-cat="${escapeHtml(cat)}">${escapeHtml(tr.btnRename)}</button>
           <button class="btn btn-xs btn-danger" data-del-cat="${escapeHtml(cat)}">${escapeHtml(tr.btnDelete)}</button>
         </div>
@@ -513,14 +511,6 @@ function renderCategoryManager() {
       renamingCategory = null;
       renderCategoryManager();
     }
-  });
-
-  panel.querySelectorAll<HTMLButtonElement>('[data-move-cat]').forEach((btn) => {
-    btn.onclick = async () => {
-      const name = btn.dataset.moveCat || '';
-      const dir = btn.dataset.dir as 'up' | 'down';
-      await callManageCategories('move', name, undefined, dir);
-    };
   });
 
   panel.querySelectorAll<HTMLButtonElement>('[data-rename-cat]').forEach((btn) => {
@@ -991,13 +981,6 @@ function renderSkillCard(
       ? `<button class="btn btn-xs btn-secondary" data-send="${escapeHtml(prompt)}">${escapeHtml(tr.btnSend)}</button>`
       : '';
 
-  const idx = siblingNames.indexOf(s.name);
-  const canReorder = siblingNames.length > 1;
-  const moveBtns = canReorder
-    ? `<button class="btn btn-xs btn-icon" data-move-item="skill" data-item-name="${escapeHtml(s.name)}" data-dir="up" ${idx === 0 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveUp)}">↑</button>
-       <button class="btn btn-xs btn-icon" data-move-item="skill" data-item-name="${escapeHtml(s.name)}" data-dir="down" ${idx === siblingNames.length - 1 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveDown)}">↓</button>`
-    : '';
-
   return `
     <div class="card ${s.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="skill" data-card-name="${escapeHtml(s.name)}" data-card-cat="${escapeHtml(s.category)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
       <div class="card-top">
@@ -1007,7 +990,6 @@ function renderSkillCard(
           ${newBadge}${statusBadge}${sourceBadge}${catBadge}
         </div>
         <div class="card-ops">
-          ${moveBtns}
           ${toggleBtn}
           <button class="btn btn-xs btn-primary" data-copy="${escapeHtml(prompt)}">${escapeHtml(tr.btnCopy)}</button>
           ${sendBtn}
@@ -1062,13 +1044,6 @@ function renderMcpCard(m: McpItem, siblingNames: string[]): string {
     ? `<span class="note-tag note-tag-custom">${escapeHtml(tr.customTag)}</span>`
     : '';
 
-  const idx = siblingNames.indexOf(m.name);
-  const canReorder = siblingNames.length > 1;
-  const moveBtns = canReorder
-    ? `<button class="btn btn-xs btn-icon" data-move-item="mcp" data-item-name="${escapeHtml(m.name)}" data-dir="up" ${idx === 0 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveUp)}">↑</button>
-       <button class="btn btn-xs btn-icon" data-move-item="mcp" data-item-name="${escapeHtml(m.name)}" data-dir="down" ${idx === siblingNames.length - 1 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveDown)}">↓</button>`
-    : '';
-
   return `
     <div class="card ${m.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="mcp" data-card-name="${escapeHtml(m.name)}" data-card-cat="${escapeHtml(m.category)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
       <div class="card-top">
@@ -1078,7 +1053,6 @@ function renderMcpCard(m: McpItem, siblingNames: string[]): string {
           ${newBadge}${statusBadge}${sourceBadge}${toolBadge}${catBadge}
         </div>
         <div class="card-ops">
-          ${moveBtns}
           ${toggleBtn}
           ${endpoint ? `<button class="btn btn-xs btn-secondary" data-copy="${escapeHtml(endpoint)}" data-copy-label="${escapeHtml(tr.copiedPath)}">${escapeHtml(tr.btnCopy)}</button>` : ''}
           <button class="btn btn-xs btn-secondary" data-toggle-edit="${escapeHtml(key)}">${escapeHtml(isEditing ? tr.btnCollapseEdit : tr.btnEdit)}</button>
@@ -1159,12 +1133,6 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
     const hasNew = pItems.some((x) => x.isNew);
     const pSiblingNames = pItems.map((x) => x.name);
 
-    const pMoveBtns =
-      pluginEntries.length > 1
-        ? `<button class="btn btn-xs btn-icon" data-move-plugin="${escapeHtml(pluginName)}" data-dir="up" ${pIdx === 0 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveUp)}">↑</button>
-           <button class="btn btn-xs btn-icon" data-move-plugin="${escapeHtml(pluginName)}" data-dir="down" ${pIdx === pluginEntries.length - 1 ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveDown)}">↓</button>`
-        : '';
-
     parts.push(`
       <div class="plugin-subgroup" draggable="true" data-plugin-drag="${escapeHtml(pluginName)}" data-plugin-list="${escapeHtml(JSON.stringify(pluginNamesList))}">
         <div class="plugin-header" data-plugin-toggle="${escapeHtml(pKey)}">
@@ -1172,7 +1140,6 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
           <span class="group-arrow">${isExpanded ? '▾' : '▸'}</span>
           <span class="plugin-title">🧩 ${escapeHtml(pluginName)}</span>
           ${hasNew ? '<span class="badge badge-new">🆕</span>' : ''}
-          <span class="plugin-ops" onclick="event.stopPropagation()">${pMoveBtns}</span>
           <span class="group-count">${pItems.length}</span>
         </div>
         ${
@@ -1268,51 +1235,6 @@ function bindCardEvents(container: HTMLElement) {
       const name = rest.join(':');
       const catEl = container.querySelector<HTMLSelectElement>(`[data-edit-cat="${CSS.escape(key)}"]`);
       await saveItemMeta(kind as 'skill' | 'mcp', name, catEl?.value || '未分类', '');
-    };
-  });
-
-  // Card up/down move buttons
-  container.querySelectorAll<HTMLButtonElement>('[data-move-item]').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const kind = btn.dataset.moveItem as 'skill' | 'mcp';
-      const name = btn.dataset.itemName || '';
-      const dir = btn.dataset.dir as 'up' | 'down';
-      const cardEl = btn.closest<HTMLElement>('[data-siblings]');
-      const siblings: string[] = JSON.parse(cardEl?.dataset.siblings || '[]');
-      const idx = siblings.indexOf(name);
-      if (idx === -1) return;
-      const swap = dir === 'up' ? idx - 1 : idx + 1;
-      if (swap < 0 || swap >= siblings.length) return;
-      [siblings[idx], siblings[swap]] = [siblings[swap], siblings[idx]];
-      await reorderGroupItems(kind, siblings);
-    };
-  });
-
-  // Group header up/down buttons
-  container.querySelectorAll<HTMLButtonElement>('[data-move-group]').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const name = btn.dataset.moveGroup || '';
-      const dir = btn.dataset.dir as 'up' | 'down';
-      await callManageCategories('move', name, undefined, dir);
-    };
-  });
-
-  // Plugin subgroup up/down buttons
-  container.querySelectorAll<HTMLButtonElement>('[data-move-plugin]').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const name = btn.dataset.movePlugin || '';
-      const dir = btn.dataset.dir as 'up' | 'down';
-      const subEl = btn.closest<HTMLElement>('[data-plugin-list]');
-      const list: string[] = JSON.parse(subEl?.dataset.pluginList || '[]');
-      const idx = list.indexOf(name);
-      if (idx === -1) return;
-      const swap = dir === 'up' ? idx - 1 : idx + 1;
-      if (swap < 0 || swap >= list.length) return;
-      [list[idx], list[swap]] = [list[swap], list[idx]];
-      await reorderPlugins(list);
     };
   });
 
@@ -1567,20 +1489,12 @@ function render() {
       const isCollapsed = !isSearching && isGroupCollapsed(gKey);
       const isUserCat = cat !== '未分类';
 
-      const gMoveBtns = isUserCat
-        ? `<span class="group-ops" onclick="event.stopPropagation()">
-            <button class="btn btn-xs btn-icon" data-move-group="${escapeHtml(cat)}" data-dir="up" ${cat === catalog.categories[0] ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveUp)}">↑</button>
-            <button class="btn btn-xs btn-icon" data-move-group="${escapeHtml(cat)}" data-dir="down" ${cat === catalog.categories[catalog.categories.length - 1] ? 'disabled' : ''} title="${escapeHtml(tr.btnMoveDown)}">↓</button>
-           </span>`
-        : '';
-
       htmlParts.push(`
         <div class="group-section" draggable="${isUserCat ? 'true' : 'false'}" data-group-cat="${escapeHtml(cat)}">
           <div class="group-header" data-group-toggle="${escapeHtml(gKey)}">
             ${isUserCat ? '<span class="drag-handle" title="Drag">⋮⋮</span>' : ''}
             <span class="group-arrow">${isCollapsed ? '▸' : '▾'}</span>
             <span class="group-name">${escapeHtml(displayCategoryName(cat, lang))}</span>
-            ${gMoveBtns}
             <span class="group-count">${list.length}</span>
           </div>
           ${isCollapsed ? '' : `<div class="group-body">${renderGroupedItems(list, isSearching)}</div>`}

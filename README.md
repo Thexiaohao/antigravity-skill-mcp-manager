@@ -16,9 +16,9 @@ Once you install dozens of Skills, Plugins, and MCP Servers in Google Antigravit
 * **Functional Category Groups & Nested Plugin Folding**:
   * Organizes Skills & MCPs into clear functional groups instead of one flat list.
   * Automatically collapses items from the same Plugin into a secondary folder (e.g., `🧩 figma (17)`), keeping the panel scannable.
-* **Drag-and-Drop & `↑` / `↓` Reordering**:
+* **Drag-and-Drop Reordering**:
   * Reorder **Categories** (in Category Manager or directly on group headers).
-  * Reorder **Skills**, **MCP Servers**, and **Plugin Subgroups** via drag-and-drop or `↑` / `↓` buttons — and drag cards across groups to re-categorize them.
+  * Reorder **Skills**, **MCP Servers**, and **Plugin Subgroups** via drag-and-drop — and drag cards across groups to re-categorize them.
 * **Custom Notes + Built-in Default Descriptions**:
   * Shows helpful default descriptions automatically if you haven't written a custom note.
   * Add your own personal notes per Skill or MCP, or reset back to the default description anytime.
