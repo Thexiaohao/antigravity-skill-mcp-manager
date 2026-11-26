@@ -1255,11 +1255,13 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
       ? `<button class="btn btn-xs ${pAttached ? 'btn-enable' : 'btn-primary'}" data-attach-key="${escapeHtml(pAttachKey)}" data-attach-label="🧩 ${escapeHtml(pluginName)}" data-attach-text="${escapeHtml(pluginPrompt)}">${escapeHtml(pAttached ? tr.btnAttached : tr.btnAttach)}</button>`
       : '';
 
+    const chevronSvg = `<svg class="chevron-svg ${isExpanded ? 'is-open' : ''}" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
     parts.push(`
       <div class="plugin-subgroup" draggable="true" data-plugin-drag="${escapeHtml(pluginName)}" data-drag-text="${escapeHtml(pluginPrompt)}" data-plugin-list="${escapeHtml(JSON.stringify(pluginNamesList))}">
         <div class="plugin-header" data-plugin-toggle="${escapeHtml(pKey)}">
           <span class="drag-handle" title="Drag">⋮⋮</span>
-          <span class="group-arrow">${isExpanded ? '▾' : '▸'}</span>
+          <span class="group-arrow">${chevronSvg}</span>
           <span class="plugin-title">🧩 ${escapeHtml(pluginName)}</span>
           ${hasNew ? '<span class="badge badge-new">🆕</span>' : ''}
           <span class="plugin-ops" onclick="event.stopPropagation()">
@@ -1270,7 +1272,7 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
         </div>
         ${
           isExpanded
-            ? `<div class="plugin-body">${pItems
+            ? `<div class="plugin-body view-anim">${pItems
                 .map((it) =>
                   activeTab === 'skills'
                     ? renderSkillCard(it as SkillItem, true, pSiblingNames)
@@ -1564,15 +1566,21 @@ function render() {
   const stats = document.getElementById('stats');
   const filterRow = document.getElementById('filter-row');
   const viewBtn = document.getElementById('view-toggle-btn');
-  const tabSkills = document.getElementById('tab-skills');
-  const tabMcps = document.getElementById('tab-mcps');
   if (!container || !stats || !filterRow) return;
 
   const tr = t();
   const lang = getLang();
 
-  if (tabSkills) tabSkills.textContent = `Skills (${catalog.skills.length})`;
-  if (tabMcps) tabMcps.textContent = `MCPs (${catalog.mcps.length})`;
+  const pillNav = document.getElementById('main-pill-nav');
+  if (pillNav) {
+    pillNav.style.setProperty('--active-index', activeTab === 'skills' ? '0' : '1');
+  }
+  const tabSkills = document.getElementById('tab-skills');
+  const tabMcps = document.getElementById('tab-mcps');
+  tabSkills?.classList.toggle('is-active', activeTab === 'skills');
+  tabMcps?.classList.toggle('is-active', activeTab === 'mcps');
+  if (tabSkills) tabSkills.innerHTML = `<span class="pill-tab-label">Skills</span><span class="pill-tab-badge">${catalog.skills.length}</span>`;
+  if (tabMcps) tabMcps.innerHTML = `<span class="pill-tab-label">MCPs</span><span class="pill-tab-badge">${catalog.mcps.length}</span>`;
   filterRow.style.display = activeTab === 'skills' ? 'flex' : 'none';
   if (viewBtn) {
     viewBtn.textContent = viewMode === 'grouped' ? tr.viewGrouped : tr.viewFlat;
@@ -1627,15 +1635,17 @@ function render() {
       const isCollapsed = !isSearching && isGroupCollapsed(gKey);
       const isUserCat = cat !== '未分类';
 
+      const chevronSvg = `<svg class="chevron-svg ${!isCollapsed ? 'is-open' : ''}" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
       htmlParts.push(`
         <div class="group-section" draggable="${isUserCat ? 'true' : 'false'}" data-group-cat="${escapeHtml(cat)}">
           <div class="group-header" data-group-toggle="${escapeHtml(gKey)}">
             ${isUserCat ? '<span class="drag-handle" title="Drag">⋮⋮</span>' : ''}
-            <span class="group-arrow">${isCollapsed ? '▸' : '▾'}</span>
+            <span class="group-arrow">${chevronSvg}</span>
             <span class="group-name">${escapeHtml(displayCategoryName(cat, lang))}</span>
             <span class="group-count">${list.length}</span>
           </div>
-          ${isCollapsed ? '' : `<div class="group-body">${renderGroupedItems(list, isSearching)}</div>`}
+          ${isCollapsed ? '' : `<div class="group-body view-anim">${renderGroupedItems(list, isSearching)}</div>`}
         </div>
       `);
     }
@@ -1646,6 +1656,8 @@ function render() {
 }
 
 async function doRefreshCatalog(showMsg = false) {
+  const discBtn = document.getElementById('discover-btn');
+  if (showMsg && discBtn) discBtn.classList.add('is-spinning');
   try {
     const res = await app.callServerTool({ name: 'refresh_catalog', arguments: {} });
     if (res?.structuredContent) {
@@ -1658,25 +1670,23 @@ async function doRefreshCatalog(showMsg = false) {
     }
   } catch {
     if (showMsg) showToast(t().discoverFail);
+  } finally {
+    discBtn?.classList.remove('is-spinning');
   }
 }
 
 function setupUI() {
-  document.getElementById('tab-skills')?.addEventListener('click', (e) => {
+  document.getElementById('tab-skills')?.addEventListener('click', () => {
     activeTab = 'skills';
     categoryFilter = 'all';
     editingKey = null;
-    document.querySelectorAll('.tab').forEach((tabEl) => tabEl.classList.remove('active'));
-    (e.currentTarget as HTMLElement).classList.add('active');
     render();
   });
 
-  document.getElementById('tab-mcps')?.addEventListener('click', (e) => {
+  document.getElementById('tab-mcps')?.addEventListener('click', () => {
     activeTab = 'mcps';
     categoryFilter = 'all';
     editingKey = null;
-    document.querySelectorAll('.tab').forEach((tabEl) => tabEl.classList.remove('active'));
-    (e.currentTarget as HTMLElement).classList.add('active');
     render();
   });
 
