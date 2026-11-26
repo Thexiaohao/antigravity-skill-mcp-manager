@@ -77,6 +77,39 @@ const html = `<!DOCTYPE html>
       font-size: 12px;
     }
     .new-banner-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attached-bar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .attached-label { font-weight: 500; color: #4ade80; }
+    .attached-pills { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
+    .attached-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .pill-x {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .pill-x:hover { color: #f87171; }
     .tabs-bar {
       display: flex;
       align-items: center;
@@ -474,6 +507,7 @@ const html = `<!DOCTYPE html>
   </div>
 
   <div class="new-banner" id="new-banner"></div>
+  <div class="attached-bar" id="attached-bar"></div>
   <div class="cat-manager" id="cat-manager" style="display:none;"></div>
   <div class="settings-panel" id="settings-panel" style="display:none;"></div>
 

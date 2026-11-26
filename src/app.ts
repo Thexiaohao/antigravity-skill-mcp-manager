@@ -127,9 +127,12 @@ let showImportBox = false;
 let exportedPreview = '';
 
 let canSendMessage = false;
+let canUpdateContext = false;
 let editingKey: string | null = null;
 let renamingCategory: string | null = null;
 let lastFocusRefresh = 0;
+
+const attachedItems: { key: string; label: string; contextText: string }[] = [];
 
 // Track group & plugin fold states
 const collapsedGroups = new Set<string>();
@@ -209,6 +212,89 @@ function buildPrompt(skillName: string): string {
   const s = getSettings();
   const tpl = s.language === 'en' ? s.promptTemplateEn : s.promptTemplateZh;
   return (tpl || '{{name}}').replace(/\{\{name\}\}/g, skillName);
+}
+
+function buildPluginPrompt(pluginName: string, skillNames: string[]): string {
+  const list = skillNames.slice(0, 8).join(', ') + (skillNames.length > 8 ? ', ...' : '');
+  if (getLang() === 'en') {
+    return `Please use the "${pluginName}" plugin skill suite (including: ${list}) as needed to help me with: `;
+  }
+  return `请根据需求协同使用插件「${pluginName}」中的技能（包含：${list}）来帮我处理：`;
+}
+
+function buildMcpPrompt(mcpName: string): string {
+  if (getLang() === 'en') {
+    return `Please use the "${mcpName}" MCP server tools to help me with: `;
+  }
+  return `请使用 ${mcpName} MCP 工具来帮我处理：`;
+}
+
+async function syncAttachedContext() {
+  if (!canUpdateContext) return;
+  try {
+    if (attachedItems.length === 0) {
+      await app.updateModelContext({ content: [] });
+    } else {
+      const combined = attachedItems.map((x) => `- ${x.contextText}`).join('\n');
+      await app.updateModelContext({
+        content: [{ type: 'text', text: combined }],
+      });
+    }
+  } catch {
+    // ignore if unsupported in current surface
+  }
+}
+
+async function toggleAttachItem(key: string, label: string, contextText: string) {
+  const idx = attachedItems.findIndex((x) => x.key === key);
+  if (idx !== -1) {
+    attachedItems.splice(idx, 1);
+    await syncAttachedContext();
+    render();
+    showToast(t().detachedToast);
+  } else {
+    attachedItems.push({ key, label, contextText });
+    await syncAttachedContext();
+    render();
+    showToast(t().attachedToast);
+  }
+}
+
+function renderAttachedBar() {
+  const bar = document.getElementById('attached-bar');
+  if (!bar) return;
+  if (attachedItems.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  const tr = t();
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <span class="attached-label">📎 ${escapeHtml(tr.attachedBarLabel)}</span>
+    <div class="attached-pills">
+      ${attachedItems
+        .map(
+          (it) =>
+            `<span class="attached-pill">${escapeHtml(it.label)}<button class="pill-x" data-unattach="${escapeHtml(it.key)}">×</button></span>`
+        )
+        .join('')}
+    </div>
+    <button class="btn btn-xs btn-secondary" id="clear-attached-btn">${escapeHtml(tr.clearAttached)}</button>
+  `;
+  bar.querySelectorAll<HTMLButtonElement>('[data-unattach]').forEach((btn) => {
+    btn.onclick = async () => {
+      const k = btn.dataset.unattach || '';
+      const i = attachedItems.findIndex((x) => x.key === k);
+      if (i !== -1) attachedItems.splice(i, 1);
+      await syncAttachedContext();
+      render();
+    };
+  });
+  document.getElementById('clear-attached-btn')?.addEventListener('click', async () => {
+    attachedItems.length = 0;
+    await syncAttachedContext();
+    render();
+  });
 }
 
 function getCurrentItems(): (SkillItem | McpItem)[] {
@@ -981,8 +1067,14 @@ function renderSkillCard(
       ? `<button class="btn btn-xs btn-secondary" data-send="${escapeHtml(prompt)}">${escapeHtml(tr.btnSend)}</button>`
       : '';
 
+  const isAttached = attachedItems.some((x) => x.key === key);
+  const attachBtn =
+    canUpdateContext && !s.disabled
+      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(s.name)}" data-attach-text="${escapeHtml(prompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
+      : '';
+
   return `
-    <div class="card ${s.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="skill" data-card-name="${escapeHtml(s.name)}" data-card-cat="${escapeHtml(s.category)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
+    <div class="card ${s.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="skill" data-card-name="${escapeHtml(s.name)}" data-card-cat="${escapeHtml(s.category)}" data-drag-text="${escapeHtml(prompt)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
       <div class="card-top">
         <div class="card-left">
           <span class="drag-handle" title="Drag">⋮⋮</span>
@@ -991,6 +1083,7 @@ function renderSkillCard(
         </div>
         <div class="card-ops">
           ${toggleBtn}
+          ${attachBtn}
           <button class="btn btn-xs btn-primary" data-copy="${escapeHtml(prompt)}">${escapeHtml(tr.btnCopy)}</button>
           ${sendBtn}
           <button class="btn btn-xs btn-secondary" data-toggle-edit="${escapeHtml(key)}">${escapeHtml(isEditing ? tr.btnCollapseEdit : tr.btnEdit)}</button>
@@ -1044,8 +1137,15 @@ function renderMcpCard(m: McpItem, siblingNames: string[]): string {
     ? `<span class="note-tag note-tag-custom">${escapeHtml(tr.customTag)}</span>`
     : '';
 
+  const mcpPrompt = buildMcpPrompt(m.name);
+  const isAttached = attachedItems.some((x) => x.key === key);
+  const attachBtn =
+    canUpdateContext && !m.disabled
+      ? `<button class="btn btn-xs ${isAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(key)}" data-attach-label="${escapeHtml(m.name)}" data-attach-text="${escapeHtml(mcpPrompt)}">${escapeHtml(isAttached ? tr.btnAttached : tr.btnAttach)}</button>`
+      : '';
+
   return `
-    <div class="card ${m.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="mcp" data-card-name="${escapeHtml(m.name)}" data-card-cat="${escapeHtml(m.category)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
+    <div class="card ${m.disabled ? 'card-disabled' : ''}" draggable="true" data-card-kind="mcp" data-card-name="${escapeHtml(m.name)}" data-card-cat="${escapeHtml(m.category)}" data-drag-text="${escapeHtml(mcpPrompt)}" data-siblings="${escapeHtml(JSON.stringify(siblingNames))}">
       <div class="card-top">
         <div class="card-left">
           <span class="drag-handle" title="Drag">⋮⋮</span>
@@ -1054,6 +1154,7 @@ function renderMcpCard(m: McpItem, siblingNames: string[]): string {
         </div>
         <div class="card-ops">
           ${toggleBtn}
+          ${attachBtn}
           ${endpoint ? `<button class="btn btn-xs btn-secondary" data-copy="${escapeHtml(endpoint)}" data-copy-label="${escapeHtml(tr.copiedPath)}">${escapeHtml(tr.btnCopy)}</button>` : ''}
           <button class="btn btn-xs btn-secondary" data-toggle-edit="${escapeHtml(key)}">${escapeHtml(isEditing ? tr.btnCollapseEdit : tr.btnEdit)}</button>
         </div>
@@ -1132,14 +1233,29 @@ function renderGroupedItems(items: (SkillItem | McpItem)[], forceExpandPlugins: 
     const isExpanded = forceExpandPlugins || isPluginExpanded(pKey, pItems.length);
     const hasNew = pItems.some((x) => x.isNew);
     const pSiblingNames = pItems.map((x) => x.name);
+    const pluginPrompt = buildPluginPrompt(pluginName, pSiblingNames);
+    const pAttachKey = `plugin:${pluginName}`;
+    const pAttached = attachedItems.some((x) => x.key === pAttachKey);
+
+    const pAttachBtn = canUpdateContext
+      ? `<button class="btn btn-xs ${pAttached ? 'btn-enable' : 'btn-secondary'}" data-attach-key="${escapeHtml(pAttachKey)}" data-attach-label="🧩 ${escapeHtml(pluginName)}" data-attach-text="${escapeHtml(pluginPrompt)}">${escapeHtml(pAttached ? tr.btnAttached : tr.btnAttach)}</button>`
+      : '';
+    const pSendBtn = canSendMessage
+      ? `<button class="btn btn-xs btn-secondary" data-send="${escapeHtml(pluginPrompt)}">${escapeHtml(tr.btnSend)}</button>`
+      : '';
 
     parts.push(`
-      <div class="plugin-subgroup" draggable="true" data-plugin-drag="${escapeHtml(pluginName)}" data-plugin-list="${escapeHtml(JSON.stringify(pluginNamesList))}">
+      <div class="plugin-subgroup" draggable="true" data-plugin-drag="${escapeHtml(pluginName)}" data-drag-text="${escapeHtml(pluginPrompt)}" data-plugin-list="${escapeHtml(JSON.stringify(pluginNamesList))}">
         <div class="plugin-header" data-plugin-toggle="${escapeHtml(pKey)}">
           <span class="drag-handle" title="Drag">⋮⋮</span>
           <span class="group-arrow">${isExpanded ? '▾' : '▸'}</span>
           <span class="plugin-title">🧩 ${escapeHtml(pluginName)}</span>
           ${hasNew ? '<span class="badge badge-new">🆕</span>' : ''}
+          <span class="plugin-ops" onclick="event.stopPropagation()">
+            ${pAttachBtn}
+            <button class="btn btn-xs btn-primary" data-copy="${escapeHtml(pluginPrompt)}">${escapeHtml(tr.btnCopy)}</button>
+            ${pSendBtn}
+          </span>
           <span class="group-count">${pItems.length}</span>
         </div>
         ${
@@ -1167,6 +1283,17 @@ function bindCardEvents(container: HTMLElement) {
     btn.onclick = (e) => {
       e.stopPropagation();
       copyText(btn.dataset.copy || '', btn.dataset.copyLabel || tr.copiedPrompt);
+    };
+  });
+
+  container.querySelectorAll<HTMLButtonElement>('[data-attach-key]').forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      await toggleAttachItem(
+        btn.dataset.attachKey || '',
+        btn.dataset.attachLabel || '',
+        btn.dataset.attachText || ''
+      );
     };
   });
 
@@ -1277,7 +1404,7 @@ function bindCardEvents(container: HTMLElement) {
       const category = card.dataset.cardCat || '未分类';
       dragPayload = { type: 'card', kind, name, category };
       card.classList.add('dragging');
-      e.dataTransfer?.setData('text/plain', name);
+      e.dataTransfer?.setData('text/plain', card.dataset.dragText || name);
     });
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
@@ -1381,7 +1508,7 @@ function bindCardEvents(container: HTMLElement) {
       const name = sub.dataset.pluginDrag || '';
       dragPayload = { type: 'plugin', name };
       sub.classList.add('dragging');
-      e.dataTransfer?.setData('text/plain', name);
+      e.dataTransfer?.setData('text/plain', sub.dataset.dragText || name);
     });
     sub.addEventListener('dragend', () => {
       sub.classList.remove('dragging');
@@ -1449,6 +1576,7 @@ function render() {
   );
 
   renderNewBanner();
+  renderAttachedBar();
   renderCategoryChips();
   renderCategoryManager();
   renderSettingsPanel();
@@ -1639,6 +1767,7 @@ async function init() {
   await app.connect();
   const caps = app.getHostCapabilities();
   canSendMessage = Boolean(caps?.message);
+  canUpdateContext = Boolean(caps?.updateModelContext);
   const ctx = app.getHostContext();
   if (ctx?.theme) applyDocumentTheme(ctx.theme);
   if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
